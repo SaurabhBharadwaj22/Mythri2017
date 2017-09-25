@@ -5,7 +5,10 @@ var config = require("./db_config");
 var User = require('./user');
 var Count = require('./counter');
 var Game = require('./game');
+var Firebase = require('./firebase');
 var assert = require("assert");
+var gcm = require('node-gcm');
+var sender = new gcm.Sender('AIzaSyA0GzyhJWVfIbcxQv9GogEQVZIpKRiLNyg');
 
 module.exports = function(app,express,io){
 
@@ -665,14 +668,24 @@ api.post('/teammembers',function(req,res)
 	// API to update the login id
 api.post('/update',function(req,res)
 	{
-var mid = req.body.mid;
-var gen = req.body.gen;
-User.update({mythri_id:mid}, { $set: { gender: gen}},function(err){
+Game.find({"current":false},{"current":1,"_id":0},function(err,users)
+		{
+		if(err){
+			res.send(err);
+			return;
+		}
+
+		else{
+			users.forEach(function(n){
+Game.update({"wins":2}, { $set: { current:false,round:1,wins:1}},function(err){
 	if(err){
 				res.send(err);
 			return;}
 			else
-			res.json({message:"updated"});
+			console.log("updated");
+	});
+			});
+		}
 	});
 	});
 
@@ -754,9 +767,10 @@ User.find({"mythri_id":req.body.mid},{"name":1,"mobile":1,"games":1,"tsize":1,"g
 
 
 api.post('/randommessage',function(req,res){
-
+		var game = req.body.gname;
+		
 User.find({
-        login_id: 1
+        games: game
     }, function(err, docs) {
         if (err ) {
             console.log(err);
@@ -768,7 +782,7 @@ function userDetails(docs) {
         docs.forEach(function(user) {
             var id1 = user.mythri_id;
 		message = new Message({
-			msg:"JSSATEN Welcomes you to 5th Annual Sports Meet Mythri 2016-17 from 6-8 Oct. Hurry, register today for your game to avoid rush.",
+			msg:" Dear participants Certification and prize distribution is scheduled tomorrow at 11AM.Only those whose Mythri_ID is created are eligible. Winners names will be announced shortly.",
 			mid:id1,
 			mobile:user.mobile,
 			name:user.name
@@ -799,14 +813,16 @@ api.post('/fixture',function(req,res)
 		
 			users.forEach(function(user)
 			{
-				User.findOne({"teams":user.t_name},{"name":1,"mythri_id":1,"mobile":1,"_id":0},function(err,abc)
+				User.find({"teams":user.t_name},{"name":1,"mythri_id":1,"add_no":1,"mobile":1,"_id":0},function(err,abc)
 		{
 		if(err){
 			res.send(err);
 			return;
 		}
-
-		console.log(user.g_name,user.g_type,user.g_gen,"  ",user.t_name,"      ",abc.name,"    ",abc.mythri_id,"  ",abc.mobile);
+		
+		console.log(user.g_name,user.g_type,user.g_gen,"  ",user.t_name);
+		console.log(abc);
+		console.log("-------------------------------------------------------------");
 		});
 			});
 
@@ -869,6 +885,183 @@ api.post('/notifyuser',function(req,res){
 		}
 		res.json({msg});
 		});
+});
+
+api.post('/usermobile',function(req,res)
+	{
+	User.find({"games":req.body.gname},{"name":1,"mythri_id":1,"mobile":1,"add_no":1,"teams":1,"games":1,"_id":0},function(err,users)
+		{
+		if(err){
+			res.send(err);
+			return;
+		}
+
+		res.json({users});
+		});
+	});
+
+api.post('/semifinal',function(req,res){
+
+message = new Message({
+						msg:req.body.msg,
+							mid:req.body.mid
+												});
+										message.save(function(err){
+									if(err){
+										res.send(err);
+											return;}
+											
+													});
+});
+
+// API to send games and teams of a particular user
+
+api.post('/admin/all/users',function(req,res)
+	{
+	var mid = req.body.myth;
+	if (mid == 3000) {
+		User.find().select('name mythri_id mobile add_no games teams').exec(function(err, user){
+		
+			if(err){
+				res.send(err);
+					return;
+					}
+
+			if(!user){
+
+				res.json({message:"Not registered in any game" ,result:20});
+					}
+					else{
+						var userArray = [];
+						userArray.push(user)
+						res.send({userArray,result:0});
+					}
+			});
+	}
+	else{
+		res.json({status: 'Unauthorize Access'});
+	}
+	
+});
+
+api.post('/admin/game/users',function(req,res)
+	{
+	var mid = req.body.myth;
+	if (mid == 3000) {
+		User.find({games: {$exists: true, $ne: []}}).select('name mythri_id mobile add_no games teams').exec(function(err, user){
+		
+			if(err){
+				res.send(err);
+					return;
+					}
+
+			if(!user){
+
+				res.json({message:"Not registered in any game" ,result:20});
+					}
+					else{
+						var userArray = [];
+						userArray.push(user)
+						res.send({userArray,result:0});
+					}
+			});
+	}
+	else{
+		res.json({status: 'Unauthorize Access'});
+	}
+	
+});
+api.post('/admin/findfixedmatch',function(req,res){
+	var mid = req.body.myth;
+	if (mid == 3000) {
+		Fixture.find({"g_name":req.body.gname,"g_type":req.body.gtype,"g_gen":req.body.ggen,"fixed":true},function(err,match)
+			{
+			if(err){
+				res.send(err);
+				return;
+			}
+			res.json({match});
+		});
+	}
+	else{
+		res.json({status: 'Unauthorize Access'});
+	}
+
+});
+api.post('/admin/add/user',function(req,res)
+	{
+	var mid = req.body.myth;
+	if (mid == 3000) {
+		
+				
+			var user = new User({   //create new user collection
+			name:req.body.name,
+			
+			mobile:req.body.mobile,
+			gender:req.body.gender,
+			add_no:req.body.addno,
+			password:req.body.password,
+			mythri_id:3100,
+			login_id:req.body.login_type
+			});
+		user.save(function(err){
+			if(err){
+				res.send(err);
+			return;}
+			else{ 
+				res.json({result:0});
+		}
+
+		});
+			
+	}
+	else{
+		return 0;
+	}
+	
+});
+api.post('/push/notify',function(req,res){
+	var message = new gcm.Message({
+	    collapseKey: 'demo',
+	    priority: 'high',
+	    contentAvailable: true,
+	    delayWhileIdle: true,
+	    timeToLive: 3,
+	    restrictedPackageName: "somePackageName",
+	    dryRun: true,
+	    data: {
+	        key1: 'message1',
+	        key2: 'message2'
+	    },
+	    notification: {
+	        title: "Hello, World",
+	        icon: "ic_launcher",
+	        body: "This is a notification that will be displayed if your app is in the background."
+	    }
+	});
+	var regTokens = ['dA_OKb2mY7k:APA91bFKh0GkOjb2Nx95mixrw1K0nX3Vy7lyqPswa_rX45dCd8D0bePVBvb-silY1Y_MrdFXpeDDTwtzuVDZpMkTu48MAGWroo3J9RpkkZQRlHdKR1u8cBFDvgL3HYoEnt2S4Ybf8kO_'];
+	sender.send(message, { registrationTokens: regTokens }, function (err, response) {
+    if (err){res.json(response); console.error(err);}
+    else {res.json({status: 'success'}); console.log(response);}
+    // res.json({status: 'success'});
+});
+
+});
+api.post('/add/firebase/id',function(req,res)
+{
+	var fb = new Firebase({   
+	mythri_id:req.body.myth,
+	fb_id:req.body.fb_id,
+	});
+	fb.save(function(err){
+		if(err){
+			res.send(err);
+		return;}
+		else{ 
+			res.json({result:0});
+		}
+	});
+	
 });
 return api;
 }
