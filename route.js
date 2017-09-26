@@ -9,6 +9,7 @@ var Firebase = require('./firebase');
 var assert = require("assert");
 var gcm = require('node-gcm');
 var sender = new gcm.Sender('AIzaSyA0GzyhJWVfIbcxQv9GogEQVZIpKRiLNyg');
+var count=100;
 
 module.exports = function(app,express,io){
 
@@ -993,7 +994,7 @@ api.post('/admin/add/user',function(req,res)
 	var mid = req.body.myth;
 	if (mid == 3000) {
 		
-				
+			count = count+1;
 			var user = new User({   //create new user collection
 			name:req.body.name,
 			
@@ -1001,7 +1002,7 @@ api.post('/admin/add/user',function(req,res)
 			gender:req.body.gender,
 			add_no:req.body.addno,
 			password:req.body.password,
-			mythri_id:3100,
+			mythri_id:3100 + count,
 			login_id:req.body.login_type
 			});
 		user.save(function(err){
